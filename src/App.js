@@ -1,67 +1,86 @@
-import React, { Component } from 'react';
+import React, { useState } from 'react';
 import Pizzicato from 'pizzicato';
+import { MdPlayArrow, MdPause } from 'react-icons/md';
 
-import discombobulate from './audio.js';
+import { discombobulate, downloadAudio } from './audio.js';
 import './App.css';
+import definition from './definition.jpg'
 
 //TODO: figure out pitch stuff
-//TODO: make everything pretty
-//TODO: download audio
+//TODO: stop extra sound after pause
 
-class App extends Component {
+function App() {
 
-    constructor(props) {
-        super(props);
-        this.state = {
-            audio: null,
-            discombobulated: false,
-            playing: false
-        };
+
+    const [audio, setAudio] = useState(null);
+    const [discombobulated, setDiscombobulated] = useState(false);
+    const [playing, setPlaying] = useState(false);
+
+    const onFileChange = (event) => {
+        const audioFile = URL.createObjectURL(event.target.files[0]);
+        const audio = new Pizzicato.Sound({ source: 'file', options: { path: audioFile } }, () => { });
+        setAudio(audio);
     }
 
-    onFileChange = (event) => {
-        const audio = URL.createObjectURL(event.target.files[0]);
-        const sound = new Pizzicato.Sound({ source: 'file', options: { path: audio } }, () => { });
-        this.setState({ audio: sound });
-    }
-
-    onDiscombobulate = () => {
-        const { audio } = this.state;
-        audio.pause();
+    const onDiscombobulate = () => {
+        audio.stop();
         discombobulate(audio);
-        this.setState({ discombobulated: true, playing: false });
-        console.log(audio); //TODO: remove
+        setDiscombobulated(true); setPlaying(false);
     }
 
-    render() {
+    // TODO: get this working (correct length of context + the buffer downloading)
+    const onDownloadAudio = () => {
+        const oldContext = Pizzicato.context;
+        const offlineContext = new OfflineAudioContext(
+            2,
+            44100 * NaN,
+            44100
+        );
+        Pizzicato.context = offlineContext;
+        const renderPromise = offlineContext.startRendering();
+        renderPromise.then(renderedBuffer => {
+            downloadAudio(renderedBuffer);
+        });
+        Pizzicato.contect = oldContext;
+    }
 
-        const { audio, discombobulated, playing } = this.state;
+    return (
+        <div className="app">
+            {/* <h1>The Discombobulator</h1> */}
+            <img id="definition" src={definition} alt="" />
 
-        return (
-            <>
-                <h2>Upload an audio file:</h2>
-                <input type="file" onChange={this.onFileChange} />
+            <section>
+                <input type="file" accept="audio/*" onChange={onFileChange} />
+            </section>
+
+            <section>
                 {audio &&
                     <>
-                        <br />
-                        <button onClick={this.onDiscombobulate}>DISCOMBOBULATE!</button>
+                        <button id="discombobulate-btn"
+                            onClick={onDiscombobulate}>DISCOMBOBULATE!</button>
                     </>
                 }
+            </section>
+
+            <section>
                 {discombobulated &&
-                    <>
-                        <br />
-                        <button onClick={() => {
-                            if (playing) audio.pause()
-                            else audio.play()
-                            this.setState({ playing: !playing })
-                        }}>
-                            {playing ? "PAUSE!" : "PLAY!"}
+                    <div className="final-btns">
+                        <button id="play-pause-btn"
+                            onClick={() => {
+                                if (playing) audio.pause()
+                                else audio.play()
+                                setPlaying(!playing);
+                            }}>
+                            {playing ? <MdPause size={50} /> : <MdPlayArrow size={50} />}
                         </button>
-                    </>
+                        <button onClick={onDownloadAudio}>
+                            DOWNLOAD!
+                        </button>
+                    </div>
                 }
-            </>
-        );
-    }
+            </section>
+        </div>
+    );
 }
 
 export default App;
